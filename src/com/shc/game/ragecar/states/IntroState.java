@@ -2,7 +2,6 @@ package com.shc.game.ragecar.states;
 
 import com.shc.game.ragecar.Resources;
 import com.shc.game.ragecar.entities.CitizenCar;
-import com.shc.game.ragecar.entities.PlayerCar;
 import com.shc.game.ragecar.entities.PoliceCar;
 import com.shc.silenceengine.collision.broadphase.DynamicTree2D;
 import com.shc.silenceengine.collision.colliders.SceneCollider2D;
@@ -13,7 +12,6 @@ import com.shc.silenceengine.graphics.Batcher;
 import com.shc.silenceengine.graphics.Color;
 import com.shc.silenceengine.graphics.Graphics2D;
 import com.shc.silenceengine.input.Keyboard;
-import com.shc.silenceengine.math.Vector2;
 import com.shc.silenceengine.scene.Scene2D;
 import com.shc.silenceengine.scene.entity.Entity2D;
 import com.shc.silenceengine.utils.GameTimer;
@@ -25,7 +23,7 @@ import static com.shc.game.ragecar.Main.*;
 /**
  * @author Sri Harsha Chilakapati
  */
-public class PlayState extends GameState
+public class IntroState extends GameState
 {
     private Scene2D         scene;
     private SceneCollider2D collider;
@@ -34,31 +32,29 @@ public class PlayState extends GameState
     public void onEnter()
     {
         GAME_SPEED = 0.5f;
-        DISTANCE = 0;
-        DAMAGE = 0;
 
+        // Create a scene (used to show dynamic levels in background)
         scene = new Scene2D();
 
+        // Setup a collider (used to prevent cars from colliding)
         collider = new SceneCollider2D(new DynamicTree2D());
         collider.setScene(scene);
 
-        collider.register(PlayerCar.class, CitizenCar.class);
         collider.register(CitizenCar.class, CitizenCar.class);
-        collider.register(PoliceCar.class, PlayerCar.class);
         collider.register(PoliceCar.class, CitizenCar.class);
 
-        scene.addChild(new PlayerCar(new Vector2(CANVAS_WIDTH / 4, CANVAS_HEIGHT - CANVAS_HEIGHT / 4)));
-
+        // Setup a timer to spawn cars every two seconds
         GameTimer timer = new GameTimer(2, TimeUtils.Unit.SECONDS);
         timer.setCallback(() ->
         {
-            if (Game.getGameState() instanceof PlayState)
+            if (Game.getGameState() instanceof IntroState)
             {
                 scene.addChild(new CitizenCar(MathUtils.random_range(0, CANVAS_WIDTH - 100)));
 
                 if (PoliceCar.INSTANCE_COUNT == 0 && GAME_SPEED > 2 && MathUtils.chance(10))
                     scene.addChild(new PoliceCar(MathUtils.random_range(0, CANVAS_WIDTH - 100)));
 
+                // Start the timer again
                 timer.start();
             }
         });
@@ -69,19 +65,17 @@ public class PlayState extends GameState
     public void update(float delta)
     {
         if (Keyboard.isClicked(Keyboard.KEY_ESCAPE))
-            Game.setGameState(new IntroState());
+            Game.end();
+
+        if (Keyboard.isClicked(Keyboard.KEY_SPACE))
+            Game.setGameState(new PlayState());
 
         scene.update(delta);
         collider.checkCollisions();
 
+        // Increase the game speed a bit
         GAME_SPEED += 0.001f;
-        DISTANCE += 2 * delta;
         GAME_SPEED = MathUtils.clamp(GAME_SPEED, 0, 3.5f);
-
-        DAMAGE = MathUtils.clamp(DAMAGE, 0, 100);
-
-        if (DAMAGE >= 100)
-            Game.setGameState(new IntroState());
     }
 
     @Override
@@ -92,13 +86,19 @@ public class PlayState extends GameState
         g2d.getCamera().apply();
         scene.render(delta);
 
+        // Render the street lights
         g2d.drawTexture(Resources.Textures.STREET_LIGHTS, 0, BACKGROUND_SCROLL, CANVAS_WIDTH, CANVAS_HEIGHT);
 
         if (BACKGROUND_SCROLL > 0)
             g2d.drawTexture(Resources.Textures.STREET_LIGHTS, 0, BACKGROUND_SCROLL - CANVAS_HEIGHT, CANVAS_WIDTH, CANVAS_HEIGHT);
 
+        // The ENTER key is used for debug rendering
         if (Keyboard.isPressed(Keyboard.KEY_ENTER))
             debugRender();
+
+        // Render the logo in the center
+        g2d.drawTexture(Resources.Sprites.CAR_RED.getTexture(), 350, CANVAS_HEIGHT/2 - 160, 96 * 2, 160 * 2);
+        g2d.drawTexture(Resources.Textures.LOGO, 350 + 96 * 2, CANVAS_HEIGHT/2 - Resources.Textures.LOGO.getHeight()/2);
 
         String distanceString = "Distance: " + ((int) DISTANCE) + "m";
         String damageString = "Damage: " + DAMAGE;
@@ -136,8 +136,24 @@ public class PlayState extends GameState
         y = 10 + g2d.getFont().getHeight();
         g2d.setColor(color);
         g2d.drawString(damageString, x, y);
+
+        // Draw the state message in the bottom
+        String stateMessage = "Press SPACE to find out how much distance\nyou can drive on a highway of cars in RAGE!";
+        float stateMessageWidth = g2d.getFont().getWidth(stateMessage);
+
+        x = CANVAS_WIDTH/2 - stateMessageWidth/2;
+        y = CANVAS_HEIGHT - 2 * g2d.getFont().getHeight() - 15;
+
+        g2d.setColor(Color.BLACK);
+        g2d.fillRect(x - 20, y - 10, stateMessageWidth + 20, CANVAS_HEIGHT);
+
+        g2d.setColor(Color.WHITE);
+        g2d.drawString(stateMessage, x, y);
     }
 
+    /**
+     * Utility method to debug drawing.
+     */
     private void debugRender()
     {
         Graphics2D g2d = SilenceEngine.graphics.getGraphics2D();
